@@ -1,0 +1,36 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+>
+  <rect
+    x="7"
+    y="19"
+    width="50"
+    height="37"
+    rx="7"
+    fill="#111827"
+  />
+
+  <path
+    d="M23 19V15C23 11.7 25.7 9 29 9H35C38.3 9 41 11.7 41 15V19"
+    fill="none"
+    stroke="#111827"
+    stroke-width="5"
+  />
+
+  <path
+    d="M7 32H57"
+    stroke="white"
+    stroke-width="3"
+    opacity="0.9"
+  />
+
+  <rect
+    x="28"
+    y="29"
+    width="8"
+    height="8"
+    rx="2"
+    fill="white"
+  />
+</svg>
