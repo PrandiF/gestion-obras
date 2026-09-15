@@ -269,7 +269,7 @@ export default async function CierrePage({ params }: Props) {
   const totalPendiente = totalCierre - totalPagado;
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
       <div className="mx-auto max-w-6xl">
         <Link
           href="/pagos"

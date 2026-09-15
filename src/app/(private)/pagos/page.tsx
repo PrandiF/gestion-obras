@@ -32,7 +32,7 @@ export default async function PagosPage() {
     console.error("Error obteniendo cierres:", error);
 
     return (
-      <main className="p-8">
+      <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
         <p className="text-red-600">
           Ocurrió un error al cargar los cierres semanales.
         </p>
@@ -43,7 +43,7 @@ export default async function PagosPage() {
   const cierres = (data ?? []) as Cierre[];
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-start justify-between gap-6">
           <div>
@@ -56,7 +56,7 @@ export default async function PagosPage() {
 
           <Link
             href="/pagos/nuevo-cierre"
-            className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 xl:px-4 px-2 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 whitespace-nowrap"
           >
             + Nuevo cierre semanal
           </Link>
@@ -83,58 +83,112 @@ export default async function PagosPage() {
             </Link>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <table className="w-full">
-              <thead className="border-b border-gray-200 bg-gray-50">
-                <tr>
-                  <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
-                    Período
-                  </th>
+          <>
+            <div className="space-y-3 md:hidden">
+              {cierres.map((cierre) => (
+                <div
+                  key={cierre.id}
+                  className="rounded-xl border border-gray-200 bg-white p-4"
+                >
+                  {/* Período + estado */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Período
+                      </p>
 
-                  <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
-                    Fecha de pago
-                  </th>
+                      <p className="mt-1 font-medium text-gray-900">
+                        {formatDate(cierre.fecha_desde)}
+                        {" → "}
+                        {formatDate(cierre.fecha_hasta)}
+                      </p>
+                    </div>
 
-                  <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
-                    Estado
-                  </th>
-
-                  <th className="px-5 py-3 text-right text-sm font-medium text-gray-600">
-                    Acción
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-100">
-                {cierres.map((cierre) => (
-                  <tr key={cierre.id}>
-                    <td className="px-5 py-4 font-medium text-gray-900">
-                      {formatDate(cierre.fecha_desde)}
-                      {" → "}
-                      {formatDate(cierre.fecha_hasta)}
-                    </td>
-
-                    <td className="px-5 py-4 text-sm text-gray-600">
-                      {cierre.fecha_pago ? formatDate(cierre.fecha_pago) : "—"}
-                    </td>
-
-                    <td className="px-5 py-4">
+                    <div className="shrink-0">
                       <EstadoCierre estado={cierre.estado} />
-                    </td>
+                    </div>
+                  </div>
 
-                    <td className="px-5 py-4 text-right">
-                      <Link
-                        href={`/pagos/${cierre.id}`}
-                        className="text-sm font-medium text-gray-900 hover:underline"
-                      >
-                        Ver cierre →
-                      </Link>
-                    </td>
+                  {/* Información */}
+                  <div className="mt-4 border-t border-gray-100 pt-4">
+                    <div className="flex items-center justify-between gap-4 text-sm">
+                      <span className="text-gray-500">Fecha de pago</span>
+
+                      <span className="font-medium text-gray-800">
+                        {cierre.fecha_pago
+                          ? formatDate(cierre.fecha_pago)
+                          : "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Acción */}
+                  <div className="mt-4 border-t border-gray-100 pt-4">
+                    <Link
+                      href={`/pagos/${cierre.id}`}
+                      className="flex w-full items-center justify-center rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+                    >
+                      Ver cierre →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="md:block hidden overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <table className="w-full">
+                <thead className="border-b border-gray-200 bg-gray-50">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
+                      Período
+                    </th>
+
+                    <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
+                      Fecha de pago
+                    </th>
+
+                    <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
+                      Estado
+                    </th>
+
+                    <th className="px-5 py-3 text-right text-sm font-medium text-gray-600">
+                      Acción
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody className="divide-y divide-gray-100">
+                  {cierres.map((cierre) => (
+                    <tr key={cierre.id}>
+                      <td className="px-5 py-4 font-medium text-gray-900">
+                        {formatDate(cierre.fecha_desde)}
+                        {" → "}
+                        {formatDate(cierre.fecha_hasta)}
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-gray-600">
+                        {cierre.fecha_pago
+                          ? formatDate(cierre.fecha_pago)
+                          : "—"}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <EstadoCierre estado={cierre.estado} />
+                      </td>
+
+                      <td className="px-5 py-4 text-right">
+                        <Link
+                          href={`/pagos/${cierre.id}`}
+                          className="text-sm font-medium text-gray-900 hover:underline"
+                        >
+                          Ver cierre →
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </main>

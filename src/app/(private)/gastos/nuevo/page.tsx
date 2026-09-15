@@ -3,7 +3,7 @@ import GastoForm from "@/components/GastoForm";
 
 export default function NuevoGastoPage() {
   return (
-    <main className="p-8">
+    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
           <Link

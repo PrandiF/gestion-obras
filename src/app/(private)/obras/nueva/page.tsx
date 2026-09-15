@@ -40,9 +40,9 @@ export default function NuevaObraPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
+    <main className="min-h-screen bg-gray-50 p-6 xl:p-8 xl:pt-0 pt-20">
       <div className="mx-auto max-w-2xl">
-        <div className="mb-8">
+        <div className="mb-8 ">
           <Link
             href="/obras"
             className="text-sm text-gray-500 hover:text-gray-900"

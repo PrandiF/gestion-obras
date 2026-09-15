@@ -21,7 +21,7 @@ export default async function ProveedoresPage() {
     console.error("Error obteniendo categorías:", error);
 
     return (
-      <main className="p-8">
+      <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
         <p className="text-red-600">
           Ocurrió un error al cargar las categorías de proveedores.
         </p>
@@ -30,7 +30,7 @@ export default async function ProveedoresPage() {
   }
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -45,7 +45,7 @@ export default async function ProveedoresPage() {
 
           <Link
             href="/proveedores/nuevo"
-            className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-4 py-2 xl:py-2.5 text-sm font-medium  text-white transition hover:bg-gray-800 xl:text-start text-center"
           >
             + Nuevo proveedor
           </Link>

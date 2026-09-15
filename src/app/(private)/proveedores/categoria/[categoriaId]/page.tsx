@@ -111,7 +111,7 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
         <div className="mb-8">
@@ -173,49 +173,92 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-                <table className="w-full">
-                  <thead className="border-b border-gray-200 bg-gray-50">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
-                        Empleado
-                      </th>
+              <>
+                {/* MOBILE */}
+                <div className="space-y-3 md:hidden">
+                  {empleados.map((empleado) => (
+                    <div
+                      key={empleado.id}
+                      className="rounded-xl border border-gray-200 bg-white p-4"
+                    >
+                      {/* Nombre */}
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Empleado
+                        </p>
 
-                      <th className="px-5 py-3 text-right text-sm font-medium text-gray-600">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-gray-100">
-                    {empleados.map((empleado) => (
-                      <tr key={empleado.id}>
-                        <td className="px-5 py-4 font-medium text-gray-900">
+                        <p className="mt-1 font-medium text-gray-900">
                           {empleado.nombre}
-                        </td>
+                        </p>
+                      </div>
 
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-end gap-4">
-                            <Link
-                              href={`/empleados/${empleado.id}`}
-                              className="text-sm font-medium text-gray-700 hover:text-gray-950"
-                            >
-                              Ver detalle
-                            </Link>
-                            <span className="text-gray-300">|</span>
+                      {/* Acciones */}
+                      <div className="mt-4 flex items-center justify-end gap-4 border-t border-gray-100 pt-4">
+                        <Link
+                          href={`/empleados/${empleado.id}`}
+                          className="text-sm font-medium text-gray-700 hover:text-gray-950"
+                        >
+                          Ver detalle
+                        </Link>
 
-                            <EliminarEntidadButton
-                              id={empleado.id}
-                              nombre={empleado.nombre}
-                              tipo="empleado"
-                            />
-                          </div>
-                        </td>
+                        <span className="text-gray-300">|</span>
+
+                        <EliminarEntidadButton
+                          id={empleado.id}
+                          nombre={empleado.nombre}
+                          tipo="empleado"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* DESKTOP */}
+                <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
+                  <table className="w-full">
+                    <thead className="border-b border-gray-200 bg-gray-50">
+                      <tr>
+                        <th className="px-5 py-3 text-left text-sm font-medium text-gray-600">
+                          Empleado
+                        </th>
+
+                        <th className="px-5 py-3 text-right text-sm font-medium text-gray-600">
+                          Acciones
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-100">
+                      {empleados.map((empleado) => (
+                        <tr key={empleado.id}>
+                          <td className="px-5 py-4 font-medium text-gray-900">
+                            {empleado.nombre}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="flex items-center justify-end gap-4">
+                              <Link
+                                href={`/empleados/${empleado.id}`}
+                                className="text-sm font-medium text-gray-700 hover:text-gray-950"
+                              >
+                                Ver detalle
+                              </Link>
+
+                              <span className="text-gray-300">|</span>
+
+                              <EliminarEntidadButton
+                                id={empleado.id}
+                                nombre={empleado.nombre}
+                                tipo="empleado"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </section>
         )}

@@ -294,7 +294,7 @@ export default function RegistrarPagoForm({
   }
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:p-8 xl:pt-0 pt-20">
       <div className="mx-auto max-w-3xl">
         <Link
           href={`/pagos/${cierreId}`}

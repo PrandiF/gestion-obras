@@ -15,7 +15,7 @@ export default async function EmpleadosPage() {
     console.error("Error obteniendo empleados:", error);
 
     return (
-      <main className="p-8">
+      <main className="p-6 xl:p-8 xl:pt-0 pt-20 -8">
         <p className="text-red-600">
           Ocurrió un error al cargar los empleados.
         </p>
@@ -24,7 +24,7 @@ export default async function EmpleadosPage() {
   }
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -37,7 +37,7 @@ export default async function EmpleadosPage() {
 
           <Link
             href="/empleados/nuevo"
-            className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 xl:text-start text-center"
           >
             + Nuevo empleado
           </Link>

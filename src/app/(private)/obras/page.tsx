@@ -20,7 +20,7 @@ export default async function ObrasPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
+    <main className="min-h-screen bg-gray-50 p-6 xl:pt-0 pt-20">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -33,7 +33,7 @@ export default async function ObrasPage() {
 
           <Link
             href="/obras/nueva"
-            className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+            className="rounded-lg bg-gray-900 px-4 py-2 xl:py-2.5 text-sm font-medium  text-white transition hover:bg-gray-800 whitespace-nowrap"
           >
             + Nueva obra
           </Link>
@@ -50,7 +50,7 @@ export default async function ObrasPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid xl:gap-4 md:grid-cols-2 lg:grid-cols-3 grid-cols-1 ">
             {obras.map((obra) => (
               <div
                 key={obra.id}
