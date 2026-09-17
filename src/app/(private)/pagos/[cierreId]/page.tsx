@@ -31,20 +31,6 @@ type Gasto = {
   } | null;
 };
 
-type Pago = {
-  id: string;
-  tipo_destinatario: "proveedor" | "empleado" | "persona_reintegro" | "otro";
-
-  proveedor_id: string | null;
-  empleado_id: string | null;
-  persona_reintegro_id: string | null;
-
-  importe: number;
-  fecha_pago: string;
-  medio_pago: string;
-  comprobante_path: string | null;
-};
-
 type Cierre = {
   id: string;
   fecha_desde: string;
@@ -62,15 +48,16 @@ type Grupo = {
   nombre: string;
   gastos: Gasto[];
   total: number;
-
-  pago: Pago | null;
-  comprobanteUrl: string | null;
 };
 
 export default async function CierrePage({ params }: Props) {
   const { cierreId } = await params;
 
   const supabase = await createClient();
+
+  // =========================================================
+  // CIERRE
+  // =========================================================
 
   const { data: cierreData, error: cierreError } = await supabase
     .from("cierres_semanales")
@@ -91,6 +78,10 @@ export default async function CierrePage({ params }: Props) {
   }
 
   const cierre = cierreData as Cierre;
+
+  // =========================================================
+  // GASTOS DEL CIERRE
+  // =========================================================
 
   const { data: gastosData, error: gastosError } = await supabase
     .from("gastos")
@@ -132,29 +123,31 @@ export default async function CierrePage({ params }: Props) {
 
   const gastos = (gastosData ?? []) as unknown as Gasto[];
 
-  // Traemos los pagos que ya pertenecen a este cierre.
-  const { data: pagosData, error: pagosError } = await supabase
-    .from("pagos")
-    .select(
-      `
-        id,
-        tipo_destinatario,
-        proveedor_id,
-        empleado_id,
-        persona_reintegro_id,
-        importe,
-        fecha_pago,
-        medio_pago,
-        comprobante_path
-      `,
-    )
-    .eq("cierre_id", cierreId);
+  // =========================================================
+  // GASTOS QUE YA TIENEN UN PAGO ASOCIADO
+  // =========================================================
+  //
+  // Consultamos pago_gastos directamente.
+  // Si el ID de un gasto aparece acá, consideramos ese gasto pagado.
+  //
 
-  if (pagosError) {
-    console.error("Error obteniendo pagos:", pagosError);
+  const { data: relacionesPago, error: relacionesPagoError } = await supabase
+    .from("pago_gastos")
+    .select("gasto_id");
+
+  if (relacionesPagoError) {
+    console.error("Error obteniendo relaciones de pagos:", relacionesPagoError);
   }
 
-  const pagos = (pagosData ?? []) as unknown as Pago[];
+  const gastosPagadosIds = new Set(
+    (relacionesPago ?? []).map((relacion) => relacion.gasto_id),
+  );
+
+  const estaGastoPagado = (gastoId: string) => gastosPagadosIds.has(gastoId);
+
+  // =========================================================
+  // AGRUPAR GASTOS POR DESTINATARIO
+  // =========================================================
 
   const gruposMap = new Map<string, Grupo>();
 
@@ -199,77 +192,37 @@ export default async function CierrePage({ params }: Props) {
         nombre,
         gastos: [gasto],
         total: Number(gasto.importe),
-        pago: null,
-        comprobanteUrl: null,
       });
     }
   }
 
-  let grupos = Array.from(gruposMap.values());
+  const grupos = Array.from(gruposMap.values());
 
-  // Asociamos cada pago con su grupo.
-  grupos = grupos.map((grupo) => {
-    const pago =
-      pagos.find((pago) => {
-        if (grupo.tipoDestinatario === "proveedor") {
-          return (
-            pago.tipo_destinatario === "proveedor" &&
-            pago.proveedor_id === grupo.destinatarioId
-          );
-        }
+  // =========================================================
+  // TOTALES GENERALES
+  // =========================================================
 
-        if (grupo.tipoDestinatario === "empleado") {
-          return (
-            pago.tipo_destinatario === "empleado" &&
-            pago.empleado_id === grupo.destinatarioId
-          );
-        }
-
-        if (grupo.tipoDestinatario === "persona_reintegro") {
-          return (
-            pago.tipo_destinatario === "persona_reintegro" &&
-            pago.persona_reintegro_id === grupo.destinatarioId
-          );
-        }
-
-        return pago.tipo_destinatario === "otro";
-      }) ?? null;
-
-    return {
-      ...grupo,
-      pago,
-    };
-  });
-
-  // Creamos URLs temporales para comprobantes.
-  grupos = await Promise.all(
-    grupos.map(async (grupo) => {
-      if (!grupo.pago?.comprobante_path) {
-        return grupo;
-      }
-
-      const { data } = await supabase.storage
-        .from("documentos")
-        .createSignedUrl(grupo.pago.comprobante_path, 60 * 10);
-
-      return {
-        ...grupo,
-        comprobanteUrl: data?.signedUrl ?? null,
-      };
-    }),
-  );
-
-  const totalCierre = grupos.reduce((total, grupo) => total + grupo.total, 0);
-
-  const totalPagado = grupos.reduce(
-    (total, grupo) => total + (grupo.pago ? Number(grupo.pago.importe) : 0),
+  const totalCierre = gastos.reduce(
+    (total, gasto) => total + Number(gasto.importe),
     0,
   );
 
+  const totalPagado = gastos.reduce((total, gasto) => {
+    if (estaGastoPagado(gasto.id)) {
+      return total + Number(gasto.importe);
+    }
+
+    return total;
+  }, 0);
+
   const totalPendiente = totalCierre - totalPagado;
 
+  // =========================================================
+  // RENDER
+  // =========================================================
+
   return (
-    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
+    <main className="p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-6xl">
         <Link
           href="/pagos"
@@ -278,6 +231,7 @@ export default async function CierrePage({ params }: Props) {
           ← Volver a pagos
         </Link>
 
+        {/* Encabezado */}
         <div className="mt-6 mb-8">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-semibold text-gray-900">
@@ -294,6 +248,7 @@ export default async function CierrePage({ params }: Props) {
           </p>
         </div>
 
+        {/* Resumen general */}
         <div className="mb-8 grid gap-4 md:grid-cols-3">
           <Resumen label="Total del cierre" value={totalCierre} />
 
@@ -310,111 +265,200 @@ export default async function CierrePage({ params }: Props) {
           </p>
         </div>
 
+        {/* Grupos */}
         <div className="space-y-4">
-          {grupos.map((grupo) => (
-            <div
-              key={grupo.key}
-              className="overflow-hidden rounded-xl border border-gray-200 bg-white"
-            >
-              <div className="flex items-center justify-between gap-5 border-b border-gray-200 bg-gray-50 px-5 py-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <p className="font-semibold text-gray-900">
-                      {grupo.nombre}
-                    </p>
+          {grupos.map((grupo) => {
+            // Gastos pagados de este grupo
+            const gastosPagados = grupo.gastos.filter((gasto) =>
+              estaGastoPagado(gasto.id),
+            );
 
-                    {grupo.pago ? (
-                      <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-                        Pagado ✓
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700">
-                        Pendiente
-                      </span>
-                    )}
-                  </div>
+            // Gastos pendientes de este grupo
+            const gastosPendientes = grupo.gastos.filter(
+              (gasto) => !estaGastoPagado(gasto.id),
+            );
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    {formatTipoDestinatario(grupo.tipoDestinatario)}
-                  </p>
-                </div>
+            // Estado general del grupo
+            const grupoPagado = gastosPendientes.length === 0;
 
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Total</p>
+            const grupoParcial =
+              gastosPagados.length > 0 && gastosPendientes.length > 0;
 
-                  <p className="mt-1 text-lg font-semibold text-gray-900">
-                    {formatCurrency(grupo.total)}
-                  </p>
-                </div>
-              </div>
+            // Totales del grupo
+            const totalPagadoGrupo = gastosPagados.reduce(
+              (total, gasto) => total + Number(gasto.importe),
+              0,
+            );
 
-              <div className="divide-y divide-gray-100">
-                {grupo.gastos.map((gasto) => (
-                  <div
-                    key={gasto.id}
-                    className="grid gap-3 px-5 py-4 sm:grid-cols-[120px_1fr_160px]"
-                  >
-                    <p className="text-sm text-gray-500">
-                      {formatDate(gasto.fecha)}
-                    </p>
+            const totalPendienteGrupo = gastosPendientes.reduce(
+              (total, gasto) => total + Number(gasto.importe),
+              0,
+            );
 
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {gasto.concepto}
+            return (
+              <div
+                key={grupo.key}
+                className="overflow-hidden rounded-xl border border-gray-200 bg-white"
+              >
+                {/* Cabecera del grupo */}
+                <div className="flex flex-wrap items-center justify-between gap-5 border-b border-gray-200 bg-gray-50 px-5 py-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p className="font-semibold text-gray-900">
+                        {grupo.nombre}
                       </p>
 
-                      <p className="mt-1 text-xs text-gray-500">
-                        {formatTipo(gasto.tipo)}
-                      </p>
+                      {grupoPagado ? (
+                        <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                          Pagado ✓
+                        </span>
+                      ) : grupoParcial ? (
+                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                          Pago parcial
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700">
+                          Pendiente
+                        </span>
+                      )}
                     </div>
 
-                    <p className="text-right text-sm font-medium text-gray-900">
-                      {formatCurrency(gasto.importe)}
+                    <p className="mt-1 text-xs text-gray-500">
+                      {formatTipoDestinatario(grupo.tipoDestinatario)}
                     </p>
                   </div>
-                ))}
-              </div>
 
-              <div className="border-t border-gray-200 px-5 py-4">
-                {grupo.pago ? (
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-green-700">
-                        Pago registrado
-                      </p>
+                  {/* Totales del grupo */}
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">
+                      Total {formatCurrency(grupo.total)}
+                    </p>
 
-                      <p className="mt-1 text-xs text-gray-500">
-                        {formatDate(grupo.pago.fecha_pago)}
-                        {" · "}
-                        {formatMedioPago(grupo.pago.medio_pago)}
-                      </p>
-                    </div>
+                    <p className="mt-1 text-sm font-medium text-green-700">
+                      Pagado {formatCurrency(totalPagadoGrupo)}
+                    </p>
 
-                    {grupo.comprobanteUrl && (
-                      <a
-                        href={grupo.comprobanteUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-gray-900 hover:underline"
+                    <p className="mt-1 text-sm font-semibold text-gray-900">
+                      Pendiente {formatCurrency(totalPendienteGrupo)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Gastos individuales */}
+                <div className="divide-y divide-gray-100">
+                  {grupo.gastos.map((gasto) => {
+                    const estaPagado = estaGastoPagado(gasto.id);
+
+                    return (
+                      <div
+                        key={gasto.id}
+                        className="grid gap-3 px-5 py-4 sm:grid-cols-[120px_1fr_110px_140px_150px] sm:items-center"
                       >
-                        Ver comprobante →
-                      </a>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex justify-end">
-                    <Link
-                      href={`/pagos/${cierre.id}/registrar?tipo=${grupo.tipoDestinatario}&destinatarioId=${grupo.destinatarioId ?? ""}`}
-                      className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
-                    >
-                      Registrar pago
-                    </Link>
-                  </div>
-                )}
+                        {/* Fecha */}
+                        <p className="text-sm text-gray-500">
+                          {formatDate(gasto.fecha)}
+                        </p>
+
+                        {/* Concepto */}
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {gasto.concepto}
+                          </p>
+
+                          <p className="mt-1 text-xs text-gray-500">
+                            {formatTipo(gasto.tipo)}
+                          </p>
+                        </div>
+
+                        {/* Estado */}
+                        <div className="sm:text-right">
+                          {estaPagado ? (
+                            <span className="inline-flex rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                              Pagado ✓
+                            </span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-700">
+                              Pendiente
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Importe */}
+                        <p className="text-sm font-medium text-gray-900 sm:text-right">
+                          {formatCurrency(gasto.importe)}
+                        </p>
+
+                        {/* Acción */}
+                        <div className="sm:text-right">
+                          {!estaPagado ? (
+                            <Link
+                              href={`/pagos/${cierre.id}/registrar?tipo=${grupo.tipoDestinatario}&destinatarioId=${grupo.destinatarioId ?? ""}&gastoId=${gasto.id}`}
+                              className="inline-flex whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                            >
+                              Registrar pago
+                            </Link>
+                          ) : (
+                            <span className="text-xs font-medium text-green-700">
+                              Pago registrado
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Acción grupal */}
+                <div className="border-t border-gray-200 px-5 py-4">
+                  {gastosPendientes.length > 0 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        {gastosPagados.length > 0 && (
+                          <p className="text-sm font-medium text-green-700">
+                            {gastosPagados.length}{" "}
+                            {gastosPagados.length === 1
+                              ? "gasto pagado"
+                              : "gastos pagados"}
+                          </p>
+                        )}
+
+                        <p className="mt-1 text-xs text-gray-500">
+                          Pendiente: {formatCurrency(totalPendienteGrupo)}
+                        </p>
+                      </div>
+
+                      <Link
+                        href={`/pagos/${cierre.id}/registrar?tipo=${grupo.tipoDestinatario}&destinatarioId=${grupo.destinatarioId ?? ""}`}
+                        className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800"
+                      >
+                        Registrar todos los pendientes
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-sm font-medium text-green-700">
+                        Todos los gastos están pagos ✓
+                      </p>
+
+                      <p className="text-sm font-semibold text-gray-900">
+                        {formatCurrency(grupo.total)}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {/* Sin gastos */}
+        {grupos.length === 0 && (
+          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
+            <p className="text-gray-500">
+              Este cierre no tiene gastos asociados.
+            </p>
+          </div>
+        )}
       </div>
     </main>
   );
@@ -476,17 +520,6 @@ function formatTipo(tipo: string) {
   };
 
   return tipos[tipo] ?? tipo;
-}
-
-function formatMedioPago(medio: string) {
-  const medios: Record<string, string> = {
-    transferencia: "Transferencia",
-    efectivo: "Efectivo",
-    tarjeta: "Tarjeta",
-    otro: "Otro",
-  };
-
-  return medios[medio] ?? medio;
 }
 
 function formatDate(fecha: string) {

@@ -76,13 +76,13 @@ export default function Sidebar() {
     <>
       {/* HEADER MOBILE */}
       <header className="fixed top-0 left-0 z-40 flex h-16 w-full items-center justify-between border-b border-gray-200 bg-white px-4 md:hidden">
-        <div>
+        <Link href="/obras">
           <h1 className="text-lg font-semibold text-gray-900">
             Gestión de Obras
           </h1>
 
           <p className="text-xs text-gray-500">Administración</p>
-        </div>
+        </Link>
 
         <button
           type="button"
@@ -118,13 +118,13 @@ export default function Sidebar() {
       >
         {/* HEADER SIDEBAR */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-6">
-          <div>
+          <Link href="/obras" className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold text-gray-900">
               Gestión de Obras
             </h1>
 
             <p className="mt-1 text-xs text-gray-500">Administración</p>
-          </div>
+          </Link>
 
           {/* CERRAR - MOBILE */}
           <button

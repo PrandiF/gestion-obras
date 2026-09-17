@@ -34,12 +34,14 @@ type Props = {
   cierreId: string;
   tipo: string | null;
   destinatarioId: string | null;
+  gastoId: string | null;
 };
 
 export default function RegistrarPagoForm({
   cierreId,
   tipo: tipoParam,
   destinatarioId,
+  gastoId,
 }: Props) {
   const router = useRouter();
 
@@ -52,11 +54,16 @@ export default function RegistrarPagoForm({
   const [medioPago, setMedioPago] = useState("transferencia");
 
   const [archivo, setArchivo] = useState<File | null>(null);
+
   const [observaciones, setObservaciones] = useState("");
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+
+  // =========================================================
+  // CARGAR GASTOS
+  // =========================================================
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -66,7 +73,14 @@ export default function RegistrarPagoForm({
         return;
       }
 
+      setCargando(true);
+      setError("");
+
       const supabase = createClient();
+
+      // -------------------------------------------------------
+      // 1. Traemos los gastos del cierre
+      // -------------------------------------------------------
 
       const { data, error: gastosError } = await supabase
         .from("gastos")
@@ -92,31 +106,93 @@ export default function RegistrarPagoForm({
           `,
         )
         .eq("cierre_id", cierreId)
-        .order("fecha", { ascending: true });
+        .order("fecha", {
+          ascending: true,
+        });
 
       if (gastosError) {
         console.error("Error cargando gastos:", gastosError);
 
         setError("No se pudieron cargar los gastos del pago.");
+
         setCargando(false);
         return;
       }
 
       const todos = (data ?? []) as unknown as Gasto[];
 
+      // -------------------------------------------------------
+      // 2. Traemos directamente los gastos ya pagados
+      // -------------------------------------------------------
+      //
+      // No usamos el nested pago_gastos dentro de gastos.
+      // Consultamos la tabla directamente para tener una
+      // fuente de verdad clara.
+      //
+
+      const { data: relacionesPago, error: relacionesError } = await supabase
+        .from("pago_gastos")
+        .select("gasto_id");
+
+      if (relacionesError) {
+        console.error("Error cargando relaciones de pagos:", relacionesError);
+
+        setError("No se pudo comprobar el estado de los pagos.");
+
+        setCargando(false);
+        return;
+      }
+
+      const gastosPagadosIds = new Set(
+        (relacionesPago ?? []).map((relacion) => relacion.gasto_id),
+      );
+
+      // -------------------------------------------------------
+      // 3. Filtrar gastos
+      // -------------------------------------------------------
+
       const gastosFiltrados = todos.filter((gasto) => {
+        const estaPagado = gastosPagadosIds.has(gasto.id);
+
+        // -----------------------------------------------
+        // PAGO INDIVIDUAL
+        // -----------------------------------------------
+        //
+        // Si viene gastoId, solamente mostramos ese gasto.
+        // Además comprobamos que todavía esté pendiente.
+        //
+
+        if (gastoId) {
+          return gasto.id === gastoId && !estaPagado;
+        }
+
+        // -----------------------------------------------
+        // PAGO GENERAL
+        // -----------------------------------------------
+        //
+        // Nunca incluimos gastos que ya estén pagos.
+        //
+
+        if (estaPagado) {
+          return false;
+        }
+
+        // Proveedor
         if (tipo === "proveedor") {
           return gasto.proveedores?.id === destinatarioId;
         }
 
+        // Empleado
         if (tipo === "empleado") {
           return gasto.empleados?.id === destinatarioId;
         }
 
+        // Reintegro
         if (tipo === "persona_reintegro") {
           return gasto.personas_reintegro?.id === destinatarioId;
         }
 
+        // Otros gastos
         if (tipo === "otro") {
           return (
             !gasto.proveedores && !gasto.empleados && !gasto.personas_reintegro
@@ -126,13 +202,28 @@ export default function RegistrarPagoForm({
         return false;
       });
 
+      // -------------------------------------------------------
+      // 4. Si no quedan gastos pendientes
+      // -------------------------------------------------------
+
       if (gastosFiltrados.length === 0) {
-        setError("No encontramos gastos para este destinatario.");
+        setGastos([]);
+
+        setError(
+          gastoId
+            ? "Este gasto ya fue pagado o no se encuentra disponible."
+            : "No hay gastos pendientes para registrar.",
+        );
+
         setCargando(false);
         return;
       }
 
       setGastos(gastosFiltrados);
+
+      // -------------------------------------------------------
+      // 5. Nombre del destinatario
+      // -------------------------------------------------------
 
       const primero = gastosFiltrados[0];
 
@@ -150,15 +241,28 @@ export default function RegistrarPagoForm({
     };
 
     cargarDatos();
-  }, [cierreId, destinatarioId, tipo]);
+  }, [cierreId, destinatarioId, tipo, gastoId]);
+
+  // =========================================================
+  // TOTAL
+  // =========================================================
 
   const total = gastos.reduce((acc, gasto) => acc + Number(gasto.importe), 0);
+
+  // =========================================================
+  // REGISTRAR PAGO
+  // =========================================================
 
   const registrarPago = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!tipo) {
       setError("No se pudo identificar el destinatario.");
+      return;
+    }
+
+    if (gastos.length === 0) {
+      setError("No hay gastos pendientes para registrar.");
       return;
     }
 
@@ -177,11 +281,55 @@ export default function RegistrarPagoForm({
 
     const supabase = createClient();
 
-    // 1. Crear el pago.
+    // ---------------------------------------------------------
+    // COMPROBACIÓN FINAL
+    // ---------------------------------------------------------
+    //
+    // Volvemos a consultar pago_gastos justo antes de insertar
+    // para evitar intentar pagar dos veces un gasto.
+    //
+
+    const { data: relacionesActuales, error: relacionesActualesError } =
+      await supabase.from("pago_gastos").select("gasto_id");
+
+    if (relacionesActualesError) {
+      console.error("Error comprobando pagos:", relacionesActualesError);
+
+      setError("No se pudo comprobar el estado actual de los pagos.");
+
+      setGuardando(false);
+      return;
+    }
+
+    const gastosYaPagados = new Set(
+      (relacionesActuales ?? []).map((relacion) => relacion.gasto_id),
+    );
+
+    const gastosAPagar = gastos.filter(
+      (gasto) => !gastosYaPagados.has(gasto.id),
+    );
+
+    if (gastosAPagar.length === 0) {
+      setError("Los gastos seleccionados ya fueron pagados.");
+
+      setGuardando(false);
+      return;
+    }
+
+    const totalAPagar = gastosAPagar.reduce(
+      (acc, gasto) => acc + Number(gasto.importe),
+      0,
+    );
+
+    // ---------------------------------------------------------
+    // 1. CREAR PAGO
+    // ---------------------------------------------------------
+
     const { data: pago, error: pagoError } = await supabase
       .from("pagos")
       .insert({
         cierre_id: cierreId,
+
         tipo_destinatario: tipo,
 
         proveedor_id: tipo === "proveedor" ? destinatarioId : null,
@@ -193,10 +341,14 @@ export default function RegistrarPagoForm({
 
         destinatario: tipo === "otro" ? nombreDestinatario : null,
 
-        importe: total,
+        importe: totalAPagar,
+
         fecha_pago: fechaPago,
+
         medio_pago: medioPago,
+
         comprobante_path: null,
+
         observaciones: observaciones.trim() || null,
       })
       .select("id")
@@ -206,17 +358,22 @@ export default function RegistrarPagoForm({
       console.error("Error creando pago:", pagoError);
 
       setError("No se pudo registrar el pago.");
+
       setGuardando(false);
       return;
     }
 
     let comprobantePath: string | null = null;
 
-    // 2. Subir comprobante si existe.
+    // ---------------------------------------------------------
+    // 2. SUBIR COMPROBANTE
+    // ---------------------------------------------------------
+
     if (archivo) {
       const extension = archivo.name.split(".").pop()?.toLowerCase() || "file";
 
-      comprobantePath = `pagos/${cierreId}/${crypto.randomUUID()}.${extension}`;
+      comprobantePath =
+        `pagos/${cierreId}/` + `${crypto.randomUUID()}.${extension}`;
 
       const { error: uploadError } = await supabase.storage
         .from("documentos")
@@ -225,15 +382,16 @@ export default function RegistrarPagoForm({
       if (uploadError) {
         console.error("Error subiendo comprobante:", uploadError);
 
-        // Rollback del pago.
+        // Rollback del pago
         await supabase.from("pagos").delete().eq("id", pago.id);
 
         setError("No se pudo subir el comprobante del pago.");
+
         setGuardando(false);
         return;
       }
 
-      // Asociar path del comprobante al pago.
+      // Guardar path en pagos
       const { error: updatePagoError } = await supabase
         .from("pagos")
         .update({
@@ -249,13 +407,17 @@ export default function RegistrarPagoForm({
         await supabase.from("pagos").delete().eq("id", pago.id);
 
         setError("No se pudo asociar el comprobante al pago.");
+
         setGuardando(false);
         return;
       }
     }
 
-    // 3. Relacionar el pago con todos los gastos.
-    const relaciones = gastos.map((gasto) => ({
+    // ---------------------------------------------------------
+    // 3. RELACIONAR PAGO CON LOS GASTOS
+    // ---------------------------------------------------------
+
+    const relaciones = gastosAPagar.map((gasto) => ({
       pago_id: pago.id,
       gasto_id: gasto.id,
     }));
@@ -267,23 +429,31 @@ export default function RegistrarPagoForm({
     if (relacionesError) {
       console.error("Error relacionando gastos:", relacionesError);
 
+      // Eliminar comprobante
       if (comprobantePath) {
         await supabase.storage.from("documentos").remove([comprobantePath]);
       }
 
+      // Eliminar pago
       await supabase.from("pagos").delete().eq("id", pago.id);
 
       setError("No se pudieron asociar los gastos al pago.");
+
       setGuardando(false);
       return;
     }
 
-    // El trigger de PostgreSQL se encarga de comprobar
-    // si todos los gastos del cierre quedaron pagados.
+    // El trigger de PostgreSQL comprueba
+    // si todos los gastos del cierre están pagos.
 
     router.push(`/pagos/${cierreId}`);
+
     router.refresh();
   };
+
+  // =========================================================
+  // LOADING
+  // =========================================================
 
   if (cargando) {
     return (
@@ -293,8 +463,12 @@ export default function RegistrarPagoForm({
     );
   }
 
+  // =========================================================
+  // RENDER
+  // =========================================================
+
   return (
-    <main className="p-6 xl:p-8 xl:pt-0 pt-20">
+    <main className="p-6 pt-22 xl:p-8 xl:pt-6">
       <div className="mx-auto max-w-3xl">
         <Link
           href={`/pagos/${cierreId}`}
@@ -305,7 +479,7 @@ export default function RegistrarPagoForm({
 
         <div className="mt-6 mb-8">
           <h1 className="text-3xl font-semibold text-gray-900">
-            Registrar pago
+            {gastoId ? "Registrar pago" : "Registrar pagos pendientes"}
           </h1>
 
           {nombreDestinatario && (
@@ -325,7 +499,7 @@ export default function RegistrarPagoForm({
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
               <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
                 <h2 className="font-semibold text-gray-900">
-                  Gastos incluidos
+                  {gastoId ? "Gasto incluido" : "Gastos pendientes incluidos"}
                 </h2>
               </div>
 
@@ -364,6 +538,7 @@ export default function RegistrarPagoForm({
             {/* Datos del pago */}
             <div className="rounded-xl border border-gray-200 bg-white p-6">
               <div className="grid gap-5 md:grid-cols-2">
+                {/* Fecha */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Fecha de pago
@@ -378,6 +553,7 @@ export default function RegistrarPagoForm({
                   />
                 </div>
 
+                {/* Medio */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Medio de pago
@@ -399,6 +575,7 @@ export default function RegistrarPagoForm({
                 </div>
               </div>
 
+              {/* Comprobante */}
               <div className="mt-5">
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Comprobante
@@ -416,6 +593,7 @@ export default function RegistrarPagoForm({
                 </p>
               </div>
 
+              {/* Observaciones */}
               <div className="mt-5">
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   Observaciones
@@ -430,13 +608,18 @@ export default function RegistrarPagoForm({
               </div>
             </div>
 
+            {/* Botón */}
             <div className="flex justify-end">
               <button
                 type="submit"
                 disabled={guardando}
                 className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {guardando ? "Registrando..." : "Registrar pago"}
+                {guardando
+                  ? "Registrando..."
+                  : gastoId
+                    ? "Registrar pago"
+                    : "Registrar pagos pendientes"}
               </button>
             </div>
           </form>
@@ -445,6 +628,10 @@ export default function RegistrarPagoForm({
     </main>
   );
 }
+
+// =========================================================
+// HELPERS
+// =========================================================
 
 function formatTipo(tipo: string) {
   const tipos: Record<string, string> = {

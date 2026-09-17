@@ -111,7 +111,7 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   return (
-    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
+    <main className="p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
         <div className="mb-8">

@@ -30,7 +30,7 @@ export default async function ProveedoresPage() {
   }
 
   return (
-    <main className="p-6 xl:p-8 xl:pt-0 pt-20 ">
+    <main className="p-6 xl:px-8 xl:pt-8 pt-20 ">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center justify-between">
           <div>

@@ -20,7 +20,7 @@ export default async function ObrasPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6 xl:pt-0 pt-20">
+    <main className="min-h-screen bg-gray-50 p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -50,7 +50,7 @@ export default async function ObrasPage() {
             </p>
           </div>
         ) : (
-          <div className="grid xl:gap-4 md:grid-cols-2 lg:grid-cols-3 grid-cols-1 ">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 grid-cols-1">
             {obras.map((obra) => (
               <div
                 key={obra.id}

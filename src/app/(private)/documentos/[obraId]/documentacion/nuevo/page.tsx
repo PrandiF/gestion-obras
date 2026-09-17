@@ -130,7 +130,7 @@ export default function NuevoDocumentoPage() {
   };
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-3xl">
         <Link
           href={`/documentos/${obraId}/documentacion`}

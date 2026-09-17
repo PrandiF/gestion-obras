@@ -29,7 +29,7 @@ export default async function DocumentosPage() {
   }
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-gray-900">
@@ -54,7 +54,7 @@ export default async function DocumentosPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 grid-cols-1">
             {obras.map((obra) => (
               <Link
                 key={obra.id}

@@ -102,7 +102,7 @@ export default async function DocumentacionPage({ params }: Props) {
   const documentos = (data ?? []) as Documento[];
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-7xl">
         <Link
           href={`/documentos/${obra.id}`}

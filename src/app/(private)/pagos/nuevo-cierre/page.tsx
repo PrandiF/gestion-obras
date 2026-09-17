@@ -160,7 +160,7 @@ export default function NuevoCierrePage() {
   );
 
   return (
-    <main className="p-8">
+    <main className="p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-5xl">
         <Link
           href="/pagos"
