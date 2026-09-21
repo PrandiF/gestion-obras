@@ -105,6 +105,20 @@ export default async function ProveedorDetallePage({
 
   const gastos = (data ?? []) as unknown as Gasto[];
 
+  const { data: relacionesPago, error: relacionesPagoError } = await supabase
+    .from("pago_gastos")
+    .select("gasto_id");
+
+  if (relacionesPagoError) {
+    console.error("Error obteniendo relaciones de pagos:", relacionesPagoError);
+  }
+
+  const gastosPagadosIds = new Set(
+    (relacionesPago ?? []).map((relacion) => relacion.gasto_id),
+  );
+
+  const estaGastoPagado = (gastoId: string) => gastosPagadosIds.has(gastoId);
+
   // =========================
   // COMPROBANTES
   // =========================
@@ -141,13 +155,11 @@ export default async function ProveedorDetallePage({
   );
 
   const totalPagado = gastos
-    .filter((gasto) => gasto.pago_gastos?.length > 0)
+    .filter((gasto) => estaGastoPagado(gasto.id))
     .reduce((total, gasto) => total + Number(gasto.importe), 0);
 
   const pendientePago = gastos
-    .filter(
-      (gasto) => gasto.cierre_id !== null && gasto.pago_gastos?.length === 0,
-    )
+    .filter((gasto) => gasto.cierre_id !== null && !estaGastoPagado(gasto.id))
     .reduce((total, gasto) => total + Number(gasto.importe), 0);
 
   // Normalizamos categorías porque Supabase puede tipar
@@ -288,7 +300,7 @@ export default async function ProveedorDetallePage({
 
               <tbody className="divide-y divide-gray-100">
                 {gastosConComprobante.map((gasto) => {
-                  const estaPagado = gasto.pago_gastos?.length > 0;
+                  const estaPagado = estaGastoPagado(gasto.id);
 
                   const estaCerrado = gasto.cierre_id !== null;
 
