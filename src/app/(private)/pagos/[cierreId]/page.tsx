@@ -14,7 +14,10 @@ type Gasto = {
   concepto: string;
   fecha: string;
   importe: number;
-
+  obras: {
+    id: string;
+    direccion: string;
+  } | null;
   proveedores: {
     id: string;
     nombre: string;
@@ -95,6 +98,10 @@ export default async function CierrePage({ params }: Props) {
         proveedores (
           id,
           nombre
+        ),
+        obras (
+          id,
+          direccion
         ),
         empleados (
           id,
@@ -352,7 +359,7 @@ export default async function CierrePage({ params }: Props) {
                     return (
                       <div
                         key={gasto.id}
-                        className="grid gap-3 px-5 py-4 sm:grid-cols-[120px_1fr_110px_140px_150px] sm:items-center"
+                        className="grid gap-3 px-5 py-4 sm:grid-cols-[110px_1fr_180px_110px_140px_150px] sm:items-center"
                       >
                         {/* Fecha */}
                         <p className="text-sm text-gray-500">
@@ -367,6 +374,14 @@ export default async function CierrePage({ params }: Props) {
 
                           <p className="mt-1 text-xs text-gray-500">
                             {formatTipo(gasto.tipo)}
+                          </p>
+                        </div>
+                        {/* Obra */}
+                        <div>
+                          <p className="text-xs text-gray-500">Obra</p>
+
+                          <p className="mt-1 text-sm font-medium text-gray-700">
+                            {gasto.obras?.direccion ?? "Sin obra"}
                           </p>
                         </div>
 
