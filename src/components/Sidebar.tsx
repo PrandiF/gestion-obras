@@ -113,7 +113,7 @@ export default function Sidebar() {
 
           ${menuOpen ? "translate-x-0" : "-translate-x-full"}
 
-          md:static md:h-screen md:w-64 md:translate-x-0
+          md:fixed md:top-0 md:left-0 md:h-dvh md:w-64 md:translate-x-0
         `}
       >
         {/* HEADER SIDEBAR */}
