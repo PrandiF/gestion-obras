@@ -37,15 +37,26 @@ type Gasto = {
 type Props = {
   searchParams: Promise<{
     tipo?: string;
+    page?: string;
   }>;
 };
 
 export default async function GastosPage({ searchParams }: Props) {
-  const { tipo } = await searchParams;
+  const { tipo, page } = await searchParams;
 
   const supabase = await createClient();
 
-  let query = supabase.from("gastos").select(`
+  const ITEMS_PER_PAGE = 10;
+
+  const parsedPage = Number(page);
+  const currentPage =
+    Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+
+  const from = (currentPage - 1) * ITEMS_PER_PAGE;
+  const to = from + ITEMS_PER_PAGE - 1;
+
+  let query = supabase.from("gastos").select(
+    `
     id,
     tipo,
     concepto,
@@ -53,24 +64,14 @@ export default async function GastosPage({ searchParams }: Props) {
     importe,
     observaciones,
     cierre_id,
-    obras (
-      direccion
-    ),
-    proveedores (
-      nombre
-    ),
-    empleados (
-      nombre
-    ),
-    personas_reintegro (
-      nombre
-    ),
-    documentos (
-      id,
-      nombre,
-      storage_path
-    )
-  `);
+    obras (direccion),
+    proveedores (nombre),
+    empleados (nombre),
+    personas_reintegro (nombre),
+    documentos (id, nombre, storage_path)
+    `,
+    { count: "exact" },
+  );
 
   if (
     tipo &&
@@ -86,9 +87,22 @@ export default async function GastosPage({ searchParams }: Props) {
     query = query.eq("tipo", tipo);
   }
 
-  const { data, error } = await query.order("fecha", {
-    ascending: false,
-  });
+  const { data, error, count } = await query
+    .order("fecha", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
+
+  const totalGastos = count ?? 0;
+  const totalPages = Math.ceil(totalGastos / ITEMS_PER_PAGE);
+
+  const getPageUrl = (pageNumber: number) => {
+    const params = new URLSearchParams();
+
+    if (tipo) params.set("tipo", tipo);
+    params.set("page", String(pageNumber));
+
+    return `/gastos?${params.toString()}`;
+  };
 
   const gastos = (data ?? []) as unknown as Gasto[];
 
@@ -412,6 +426,56 @@ export default async function GastosPage({ searchParams }: Props) {
                 </tbody>
               </table>
             </div>
+
+            {totalPages > 1 && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+                <p className="text-sm text-gray-500">
+                  Mostrando {from + 1}–{Math.min(to + 1, totalGastos)} de{" "}
+                  {totalGastos} gastos
+                </p>
+
+                <div className="flex items-center gap-2">
+                  {currentPage > 1 && (
+                    <Link
+                      href={getPageUrl(currentPage - 1)}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Anterior
+                    </Link>
+                  )}
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(
+                      (pageNumber) =>
+                        pageNumber === 1 ||
+                        pageNumber === totalPages ||
+                        Math.abs(pageNumber - currentPage) <= 1,
+                    )
+                    .map((pageNumber) => (
+                      <Link
+                        key={pageNumber}
+                        href={getPageUrl(pageNumber)}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                          currentPage === pageNumber
+                            ? "border-gray-900 bg-gray-900 text-white"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {pageNumber}
+                      </Link>
+                    ))}
+
+                  {currentPage < totalPages && (
+                    <Link
+                      href={getPageUrl(currentPage + 1)}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Siguiente
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

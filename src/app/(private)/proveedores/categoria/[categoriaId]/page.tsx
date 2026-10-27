@@ -7,6 +7,10 @@ type Props = {
   params: Promise<{
     categoriaId: string;
   }>;
+  searchParams: Promise<{
+    page?: string;
+    empleadosPage?: string;
+  }>;
 };
 
 type Proveedor = {
@@ -23,8 +27,23 @@ type Empleado = {
   activo: boolean;
 };
 
-export default async function ProveedoresCategoriaPage({ params }: Props) {
+export default async function ProveedoresCategoriaPage({
+  params,
+  searchParams,
+}: Props) {
   const { categoriaId } = await params;
+  const { page, empleadosPage } = await searchParams;
+
+  const ITEMS_PER_PAGE = 10;
+
+  const parsePage = (value?: string) => {
+    const parsed = Number(value);
+
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
+  };
+
+  const requestedPage = parsePage(page);
+  const requestedEmpleadosPage = parsePage(empleadosPage);
 
   const supabase = await createClient();
 
@@ -110,6 +129,59 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
     )
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
+  // PAGINACIÓN DE PROVEEDORES
+
+  const totalProveedores = proveedores.length;
+
+  const totalPages = Math.ceil(totalProveedores / ITEMS_PER_PAGE);
+
+  const currentPage = Math.min(requestedPage, Math.max(totalPages, 1));
+
+  const from = (currentPage - 1) * ITEMS_PER_PAGE;
+  const to = from + ITEMS_PER_PAGE;
+
+  const proveedoresPaginados = proveedores.slice(from, to);
+
+  // PAGINACIÓN DE EMPLEADOS
+
+  const totalEmpleados = empleados.length;
+
+  const totalEmpleadosPages = Math.ceil(totalEmpleados / ITEMS_PER_PAGE);
+
+  const currentEmpleadosPage = Math.min(
+    requestedEmpleadosPage,
+    Math.max(totalEmpleadosPages, 1),
+  );
+
+  const empleadosFrom = (currentEmpleadosPage - 1) * ITEMS_PER_PAGE;
+
+  const empleadosTo = empleadosFrom + ITEMS_PER_PAGE;
+
+  const empleadosPaginados = empleados.slice(empleadosFrom, empleadosTo);
+
+  // URLS DE PAGINACIÓN
+
+  const getPageUrl = (
+    pageNumber: number,
+    tipo: "proveedores" | "empleados",
+  ) => {
+    const params = new URLSearchParams();
+
+    params.set(
+      "page",
+      String(tipo === "proveedores" ? pageNumber : currentPage),
+    );
+
+    if (esManoDeObra) {
+      params.set(
+        "empleadosPage",
+        String(tipo === "empleados" ? pageNumber : currentEmpleadosPage),
+      );
+    }
+
+    return `/proveedores/${categoriaId}?${params.toString()}`;
+  };
+
   return (
     <main className="p-6 xl:px-8 xl:pt-6 pt-20 ">
       <div className="mx-auto max-w-6xl">
@@ -166,7 +238,7 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
               </Link>
             </div>
 
-            {empleados.length === 0 ? (
+            {empleadosPaginados.length === 0 ? (
               <div className="rounded-xl border border-gray-200 bg-white p-6">
                 <p className="text-sm text-gray-500">
                   No hay empleados activos.
@@ -176,7 +248,7 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
               <>
                 {/* MOBILE */}
                 <div className="space-y-3 md:hidden">
-                  {empleados.map((empleado) => (
+                  {empleadosPaginados.map((empleado) => (
                     <div
                       key={empleado.id}
                       className="rounded-xl border border-gray-200 bg-white p-4"
@@ -229,7 +301,7 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
                     </thead>
 
                     <tbody className="divide-y divide-gray-100">
-                      {empleados.map((empleado) => (
+                      {empleadosPaginados.map((empleado) => (
                         <tr key={empleado.id}>
                           <td className="px-5 py-4 font-medium text-gray-900">
                             {empleado.nombre}
@@ -258,6 +330,66 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
                     </tbody>
                   </table>
                 </div>
+
+                {totalEmpleadosPages > 1 && (
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+                    <p className="text-sm text-gray-500">
+                      Mostrando {empleadosFrom + 1}–
+                      {Math.min(empleadosTo, totalEmpleados)} de{" "}
+                      {totalEmpleados} empleados
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      {currentEmpleadosPage > 1 && (
+                        <Link
+                          href={getPageUrl(
+                            currentEmpleadosPage - 1,
+                            "empleados",
+                          )}
+                          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Anterior
+                        </Link>
+                      )}
+
+                      {Array.from(
+                        { length: totalEmpleadosPages },
+                        (_, i) => i + 1,
+                      )
+                        .filter(
+                          (pageNumber) =>
+                            pageNumber === 1 ||
+                            pageNumber === totalEmpleadosPages ||
+                            Math.abs(pageNumber - currentEmpleadosPage) <= 1,
+                        )
+                        .map((pageNumber) => (
+                          <Link
+                            key={pageNumber}
+                            href={getPageUrl(pageNumber, "empleados")}
+                            className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                              currentEmpleadosPage === pageNumber
+                                ? "border-gray-900 bg-gray-900 text-white"
+                                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {pageNumber}
+                          </Link>
+                        ))}
+
+                      {currentEmpleadosPage < totalEmpleadosPages && (
+                        <Link
+                          href={getPageUrl(
+                            currentEmpleadosPage + 1,
+                            "empleados",
+                          )}
+                          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Siguiente
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </section>
@@ -311,7 +443,7 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
                 </thead>
 
                 <tbody className="divide-y divide-gray-100">
-                  {proveedores.map((proveedor) => (
+                  {proveedoresPaginados.map((proveedor) => (
                     <tr key={proveedor.id}>
                       <td className="px-5 py-4 font-medium text-gray-900">
                         {proveedor.nombre}
@@ -355,6 +487,56 @@ export default async function ProveedoresCategoriaPage({ params }: Props) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-gray-500">
+                Mostrando {from + 1}–{Math.min(to, totalProveedores)} de{" "}
+                {totalProveedores} proveedores
+              </p>
+
+              <div className="flex items-center gap-2">
+                {currentPage > 1 && (
+                  <Link
+                    href={getPageUrl(currentPage - 1, "proveedores")}
+                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Anterior
+                  </Link>
+                )}
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(
+                    (pageNumber) =>
+                      pageNumber === 1 ||
+                      pageNumber === totalPages ||
+                      Math.abs(pageNumber - currentPage) <= 1,
+                  )
+                  .map((pageNumber) => (
+                    <Link
+                      key={pageNumber}
+                      href={getPageUrl(pageNumber, "proveedores")}
+                      className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                        currentPage === pageNumber
+                          ? "border-gray-900 bg-gray-900 text-white"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {pageNumber}
+                    </Link>
+                  ))}
+
+                {currentPage < totalPages && (
+                  <Link
+                    href={getPageUrl(currentPage + 1, "proveedores")}
+                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Siguiente
+                  </Link>
+                )}
+              </div>
             </div>
           )}
         </section>

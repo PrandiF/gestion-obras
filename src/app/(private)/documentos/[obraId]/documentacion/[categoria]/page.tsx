@@ -9,6 +9,9 @@ type Props = {
     obraId: string;
     categoria: string;
   }>;
+  searchParams: Promise<{
+    page?: string;
+  }>;
 };
 
 type Documento = {
@@ -53,8 +56,18 @@ const categorias: Record<
   },
 };
 
-export default async function CategoriaDocumentosPage({ params }: Props) {
+export default async function CategoriaDocumentosPage({
+  params,
+  searchParams,
+}: Props) {
   const { obraId, categoria } = await params;
+  const { page } = await searchParams;
+
+  const ITEMS_PER_PAGE = 10;
+
+  const parsedPage = Number(page);
+  const requestedPage =
+    Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
   const categoriaActual = categorias[categoria];
 
@@ -74,21 +87,53 @@ export default async function CategoriaDocumentosPage({ params }: Props) {
     notFound();
   }
 
+  const { count, error: countError } = await supabase
+    .from("documentos")
+    .select("id", { count: "exact", head: true })
+    .eq("obra_id", obraId)
+    .eq("categoria", categoria);
+
+  if (countError) {
+    console.error("Error contando documentos:", countError);
+
+    return (
+      <main className="p-8">
+        <p className="text-red-600">
+          Ocurrió un error al cargar los documentos.
+        </p>
+      </main>
+    );
+  }
+
+  const totalDocumentos = count ?? 0;
+
+  const totalPages = Math.ceil(totalDocumentos / ITEMS_PER_PAGE);
+
+  const currentPage = Math.min(requestedPage, Math.max(totalPages, 1));
+
+  const from = (currentPage - 1) * ITEMS_PER_PAGE;
+  const to = from + ITEMS_PER_PAGE - 1;
+
   const { data, error } = await supabase
     .from("documentos")
     .select(
       `
-      id,
-      nombre,
-      storage_path,
-      tipo_archivo,
-      observaciones,
-      created_at
+    id,
+    nombre,
+    storage_path,
+    tipo_archivo,
+    observaciones,
+    created_at
     `,
     )
     .eq("obra_id", obraId)
     .eq("categoria", categoria)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to);
+
+  const getPageUrl = (pageNumber: number) =>
+    `/documentos/${obraId}/documentacion/${categoria}?page=${pageNumber}`;
 
   if (error) {
     console.error("Error obteniendo documentos:", error);
@@ -250,6 +295,56 @@ export default async function CategoriaDocumentosPage({ params }: Props) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-gray-500">
+              Mostrando {from + 1}–{Math.min(to + 1, totalDocumentos)} de{" "}
+              {totalDocumentos} documentos
+            </p>
+
+            <div className="flex items-center gap-2">
+              {currentPage > 1 && (
+                <Link
+                  href={getPageUrl(currentPage - 1)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Anterior
+                </Link>
+              )}
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(
+                  (pageNumber) =>
+                    pageNumber === 1 ||
+                    pageNumber === totalPages ||
+                    Math.abs(pageNumber - currentPage) <= 1,
+                )
+                .map((pageNumber) => (
+                  <Link
+                    key={pageNumber}
+                    href={getPageUrl(pageNumber)}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                      currentPage === pageNumber
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {pageNumber}
+                  </Link>
+                ))}
+
+              {currentPage < totalPages && (
+                <Link
+                  href={getPageUrl(currentPage + 1)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Siguiente
+                </Link>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -7,6 +7,9 @@ type Props = {
   params: Promise<{
     obraId: string;
   }>;
+  searchParams: Promise<{
+    page?: string;
+  }>;
 };
 
 type Documento = {
@@ -34,8 +37,18 @@ type Documento = {
   } | null;
 };
 
-export default async function ComprobantesPage({ params }: Props) {
+export default async function ComprobantesPage({
+  params,
+  searchParams,
+}: Props) {
   const { obraId } = await params;
+  const { page } = await searchParams;
+
+  const ITEMS_PER_PAGE = 10;
+
+  const parsedPage = Number(page);
+  const requestedPage =
+    Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
   const supabase = await createClient();
 
@@ -101,9 +114,23 @@ export default async function ComprobantesPage({ params }: Props) {
     return fechaA.localeCompare(fechaB);
   });
 
+  const totalDocumentos = documentosOrdenados.length;
+
+  const totalPages = Math.ceil(totalDocumentos / ITEMS_PER_PAGE);
+
+  const currentPage = Math.min(requestedPage, Math.max(totalPages, 1));
+
+  const from = (currentPage - 1) * ITEMS_PER_PAGE;
+  const to = from + ITEMS_PER_PAGE;
+
+  const documentosPaginados = documentosOrdenados.slice(from, to);
+
+  const getPageUrl = (pageNumber: number) =>
+    `/documentos/${obraId}/comprobantes?page=${pageNumber}`;
+
   // Generamos una URL temporal para cada archivo.
   const comprobantes = await Promise.all(
-    documentosOrdenados.map(async (documento) => {
+    documentosPaginados.map(async (documento) => {
       const { data: signedData, error: signedError } = await supabase.storage
         .from("documentos")
         .createSignedUrl(documento.storage_path, 60 * 10);
@@ -251,6 +278,56 @@ export default async function ComprobantesPage({ params }: Props) {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-gray-500">
+              Mostrando {from + 1}–{Math.min(to, totalDocumentos)} de{" "}
+              {totalDocumentos} comprobantes
+            </p>
+
+            <div className="flex items-center gap-2">
+              {currentPage > 1 && (
+                <Link
+                  href={getPageUrl(currentPage - 1)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Anterior
+                </Link>
+              )}
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(
+                  (pageNumber) =>
+                    pageNumber === 1 ||
+                    pageNumber === totalPages ||
+                    Math.abs(pageNumber - currentPage) <= 1,
+                )
+                .map((pageNumber) => (
+                  <Link
+                    key={pageNumber}
+                    href={getPageUrl(pageNumber)}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                      currentPage === pageNumber
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {pageNumber}
+                  </Link>
+                ))}
+
+              {currentPage < totalPages && (
+                <Link
+                  href={getPageUrl(currentPage + 1)}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Siguiente
+                </Link>
+              )}
+            </div>
           </div>
         )}
       </div>
